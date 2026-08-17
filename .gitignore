@@ -1,0 +1,98 @@
+############################
+# 🔐 私密 / 本地文件
+############################
+my_key.txt
+opencode.json
+md5.txt
+thread_dumps.txt
+labels
+tmp
+ok-lang-hints
+############################
+# 🗂 运行生成数据（仅忽略根目录）
+############################
+/data/
+/tmp/
+/data2/
+/logs/
+/working/
+/working_images/
+/click_screenshots/
+/screenshots/
+/items_process/
+/configs/
+/tests/configs
+/tests/logs
+/cache/
+label_class
+############################
+# 🧠 OCR / 标注输出
+############################
+x-anylabeling-asset
+*.msgpack
+yolo_tem
+runs
+
+############################
+# 🤖 模型文件（如需提交请移除）
+/paddle_model/
+/tesseract/
+
+############################
+# ⚙ Python 缓存
+__pycache__/
+*$py.class
+*.pyc
+*.pyo
+
+############################
+# 🏗 构建产物
+build/
+dist/
+site/
+develop-eggs/
+.eggs/
+*.egg-info/
+*.egg
+MANIFEST
+
+############################
+# 🧳 虚拟环境
+venv/
+.venv/
+python/
+
+############################
+# 🧰 IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.workbuddy/
+
+############################
+# 🖥 PyInstaller
+*.manifest
+
+############################
+# 📦 临时 / 测试
+/test/
+/test_scripts/
+/test_ocr/
+downloads/
+autohelper
+
+############################
+# 🪟 Windows
+*.bat
+*.so
+
+############################
+# 🚫 不要忽略源码
+############################
+!src/
+!src/data/
+code_inventory.json
+docs_inventory.json
+high_risk_modules.md
+docs_audit_report.md
+dump

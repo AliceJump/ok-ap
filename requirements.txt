@@ -1,0 +1,11 @@
+# 发布流水线派生产物（由 pyproject.toml + uv.lock 生成），勿手改。
+# 本地开发请使用 `uv sync`。
+ok-script==1.0.180
+onnxocr-ppocrv5==0.0.14
+openvino==2026.0.0
+opencv-python==4.12.0.88
+json5==0.15.0
+imagehash==4.3.2
+pyautogui==0.9.54
+pynput==1.8.2
+playwright==1.57.0

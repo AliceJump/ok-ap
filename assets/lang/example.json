@@ -1,0 +1,18 @@
+{
+    "confirm_button": {
+        "zh_CN": {"string": "确认"},
+        "zh_TW": {"string": "確認"},
+        "en_US": {"string": "Confirm"},
+        "ja_JP": {"string": "確認"},
+        "ko_KR": {"string": "확인"},
+        "es_ES": {"string": "Confirmar"}
+    },
+    "cancel_button": {
+        "zh_CN": {"string": "取消"},
+        "zh_TW": {"string": "取消"},
+        "en_US": {"string": "Cancel"},
+        "ja_JP": {"string": "キャンセル"},
+        "ko_KR": {"string": "취소"},
+        "es_ES": {"string": "Cancelar"}
+    }
+}

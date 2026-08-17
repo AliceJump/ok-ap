@@ -1,0 +1,75 @@
+name: Bug 反馈 / Bug Report
+description: 创建一个报告以帮助我们修复问题 / Create a report to help us fix issues
+title: "[Bug]: "
+labels: ["bug"]
+
+body:
+  # --- 1. 引导信息 / Guide ---
+  - type: markdown
+    attributes:
+      value: |
+        ### 提交前必读 / Read Before Submitting
+        请务必先搜索现有 ISSUE，避免重复汇报。
+        Please search existing issues to avoid duplicates.
+
+  # --- 2. 问题描述 / Description ---
+  - type: textarea
+    id: description
+    attributes:
+      label: 描述这个问题 / Description
+      description: 清晰简洁地描述发生的情况。 / A clear and concise description of what happened.
+      placeholder: 请在此处详细描述 Bug... / Describe the bug here...
+    validations:
+      required: true
+
+  # --- 3. 复现步骤 / Reproduction ---
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 如何复现 / How to reproduce
+      description: 请详细列出复现步骤。 / Please list the steps to reproduce.
+      placeholder: |
+        1. 打开软件 / Open the software...
+        2. 点击设置 / Click settings...
+        3. 看到错误提示 / See error message...
+    validations:
+      required: true
+
+  # --- 4. 截图、日志与录屏 / Attachments ---
+  - type: textarea
+    id: attachments
+    attributes:
+      label: 截图、日志与录屏 / Screenshots, Logs & Recordings
+      description: |
+        **上传方式 / How to upload:**
+        1. 将图片、视频或 `.log` 文件直接 **拖拽** 到下方文本框中。
+        2. 也可以使用剪贴板粘贴 (Ctrl+V)。
+      placeholder: 请将截图、屏幕录像或日志文件拖放到此处... / Drag and drop screenshots, recordings, or logs here...
+    validations:
+      required: true
+
+  # --- 5. 版本信息 / Versions ---
+  - type: input
+    id: version
+    attributes:
+      label: 出现 bug 的版本 / Buggy Version
+      placeholder: e.g. 1.0.1
+    validations:
+      required: true
+
+  - type: input
+    id: os_version
+    attributes:
+      label: Windows 操作系统版本 / Windows OS Version
+      placeholder: e.g. Windows 11 Pro 23H2 22631.3593
+    validations:
+      required: false
+
+  # --- 6. 补充信息 / Additional Context ---
+  - type: textarea
+    id: additional
+    attributes:
+      label: 其他补充内容 / Additional Context
+      placeholder: 在这里添加关于该问题的任何其他背景信息... / Add any other context about the problem here...
+    validations:
+      required: false

@@ -1,0 +1,135 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: 1.0\n"
+"Report-Msgid-Bugs-To: you@example.com\n"
+"Last-Translator: you@example.com\n"
+"Language-Team: English\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+msgid "保存当前账号配置"
+msgstr "Guardar configuración de cuenta actual"
+
+msgid "保存账号列表"
+msgstr "Guardar lista de cuentas"
+
+msgid "当前账号配置没有变化"
+msgstr "No hay cambios en la configuración de cuenta actual"
+
+msgid "该任务暂无可编辑配置项"
+msgstr "Esta tarea no tiene ajustes editables"
+
+msgid "基础配置"
+msgstr "Configuración básica"
+
+msgid "键位配置"
+msgstr "Configuración de teclas"
+
+msgid "截图测试"
+msgstr "Prueba de captura"
+
+msgid "就绪"
+msgstr "Listo"
+
+msgid "框架自检"
+msgstr "Autocomprobación del marco"
+
+msgid "每行一个账号名，无需密码"
+msgstr "Un nombre de cuenta por línea, sin contraseña"
+
+msgid "配置默认隐藏，选择后展开对应配置项。"
+msgstr "La configuración está oculta por defecto; seleccione para expandir."
+
+msgid "其他配置"
+msgstr "Otros ajustes"
+
+msgid "清空当前任务覆盖"
+msgstr "Borrar anulación de tarea actual"
+
+msgid "清空当前账号全部覆盖"
+msgstr "Borrar todas las anulaciones de cuenta"
+
+msgid "请先选择账号"
+msgstr "Seleccione primero una cuenta"
+
+msgid "请先选择账号与任务"
+msgstr "Seleccione primero una cuenta y una tarea"
+
+msgid "全局配置"
+msgstr "Configuración global"
+
+msgid "任务"
+msgstr "Tarea"
+
+msgid "任务属性配置"
+msgstr "Configuración de atributos de tarea"
+
+msgid "示例触发任务"
+msgstr "Tarea de activación de ejemplo"
+
+msgid "示例任务"
+msgstr "Tarea de ejemplo"
+
+msgid "选择任务后自动渲染属性控件"
+msgstr "Representa los widgets de atributos tras seleccionar una tarea"
+
+msgid "已保存当前账号配置"
+msgstr "Configuración de cuenta actual guardada"
+
+msgid "已保存账号列表（新建 {created}，复用 {reused}）"
+msgstr "Lista de cuentas guardada (creadas {created}, reutilizadas {reused})"
+
+msgid "已清空：{account} / {task} 覆盖"
+msgstr "Anulación borrada: {account} / {task}"
+
+msgid "已清空账号全部覆盖：{account}"
+msgstr "Todas las anulaciones de cuenta borradas: {account}"
+
+msgid "游戏内快捷键配置"
+msgstr "Configuración de atajos en el juego"
+
+msgid "账号"
+msgstr "Cuenta"
+
+msgid "账号基础设置"
+msgstr "Configuración básica de cuenta"
+
+msgid "账号列表"
+msgstr "Lista de cuentas"
+
+msgid "账号列表操作"
+msgstr "Acciones de lista de cuentas"
+
+msgid "账号配置"
+msgstr "Configuración de cuenta"
+
+msgid "账号配置中心"
+msgstr "Centro de configuración de cuenta"
+
+msgid "账号任务覆盖操作"
+msgstr "Acciones de anulación de tarea de cuenta"
+
+msgid "账号任务选择"
+msgstr "Selección de tarea de cuenta"
+
+msgid "主界面单次动作后延迟"
+msgstr "Retraso tras una acción en la pantalla principal"
+
+msgid "状态"
+msgstr "Estado"
+
+msgid "Backpack Key"
+msgstr "Tecla de mochila"
+
+msgid "Interact Key"
+msgstr "Tecla de interacción"
+
+msgid "Jump Key"
+msgstr "Tecla de salto"
+
+msgid "Map Key"
+msgstr "Tecla de mapa"
+
+msgid "SingleActionWithDelay"
+msgstr "SingleActionWithDelay"
+

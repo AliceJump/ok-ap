@@ -1,0 +1,135 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: 1.0\n"
+"Report-Msgid-Bugs-To: you@example.com\n"
+"Last-Translator: you@example.com\n"
+"Language-Team: English\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+msgid "保存当前账号配置"
+msgstr "현재 계정 설정 저장"
+
+msgid "保存账号列表"
+msgstr "계정 목록 저장"
+
+msgid "当前账号配置没有变化"
+msgstr "현재 계정 설정에 변경 사항이 없습니다"
+
+msgid "该任务暂无可编辑配置项"
+msgstr "이 작업에는 편집 가능한 설정이 없습니다"
+
+msgid "基础配置"
+msgstr "기본 설정"
+
+msgid "键位配置"
+msgstr "키 설정"
+
+msgid "截图测试"
+msgstr "스크린샷 테스트"
+
+msgid "就绪"
+msgstr "준비됨"
+
+msgid "框架自检"
+msgstr "프레임워크 자가 점검"
+
+msgid "每行一个账号名，无需密码"
+msgstr "한 줄에 계정 이름 하나, 비밀번호 불필요"
+
+msgid "配置默认隐藏，选择后展开对应配置项。"
+msgstr "설정은 기본적으로 숨겨져 있으며 선택하면 펼쳐집니다."
+
+msgid "其他配置"
+msgstr "기타 설정"
+
+msgid "清空当前任务覆盖"
+msgstr "현재 작업 재정의 지우기"
+
+msgid "清空当前账号全部覆盖"
+msgstr "계정의 모든 재정의 지우기"
+
+msgid "请先选择账号"
+msgstr "먼저 계정을 선택하세요"
+
+msgid "请先选择账号与任务"
+msgstr "먼저 계정과 작업을 선택하세요"
+
+msgid "全局配置"
+msgstr "전역 설정"
+
+msgid "任务"
+msgstr "작업"
+
+msgid "任务属性配置"
+msgstr "작업 속성 설정"
+
+msgid "示例触发任务"
+msgstr "예제 트리거 작업"
+
+msgid "示例任务"
+msgstr "예제 작업"
+
+msgid "选择任务后自动渲染属性控件"
+msgstr "작업 선택 후 속성 위젯을 렌더링합니다"
+
+msgid "已保存当前账号配置"
+msgstr "현재 계정 설정이 저장되었습니다"
+
+msgid "已保存账号列表（新建 {created}，复用 {reused}）"
+msgstr "계정 목록이 저장되었습니다 (새로 만듦 {created}, 재사용 {reused})"
+
+msgid "已清空：{account} / {task} 覆盖"
+msgstr "재정의가 지워졌습니다: {account} / {task}"
+
+msgid "已清空账号全部覆盖：{account}"
+msgstr "계정의 모든 재정의가 지워졌습니다: {account}"
+
+msgid "游戏内快捷键配置"
+msgstr "게임 내 단축키 설정"
+
+msgid "账号"
+msgstr "계정"
+
+msgid "账号基础设置"
+msgstr "계정 기본 설정"
+
+msgid "账号列表"
+msgstr "계정 목록"
+
+msgid "账号列表操作"
+msgstr "계정 목록 작업"
+
+msgid "账号配置"
+msgstr "계정 설정"
+
+msgid "账号配置中心"
+msgstr "계정 설정 센터"
+
+msgid "账号任务覆盖操作"
+msgstr "계정 작업 재정의 작업"
+
+msgid "账号任务选择"
+msgstr "계정 작업 선택"
+
+msgid "主界面单次动作后延迟"
+msgstr "메인 화면 단일 동작 후 지연"
+
+msgid "状态"
+msgstr "상태"
+
+msgid "Backpack Key"
+msgstr "가방 키"
+
+msgid "Interact Key"
+msgstr "상호작용 키"
+
+msgid "Jump Key"
+msgstr "점프 키"
+
+msgid "Map Key"
+msgstr "지도 키"
+
+msgid "SingleActionWithDelay"
+msgstr "SingleActionWithDelay"
+
