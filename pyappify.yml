@@ -2,7 +2,7 @@ name: "ok-ap"
 uac: true
 profiles:
   - name: "Default"
-    git_url: "https://github.com/your-name/your-repo-update.git"
+    git_url: "https://github.com/AliceJump/ok-ap.git"
     admin: true
     main_script: "main.py"
     requires_python: "3.12"
