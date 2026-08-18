@@ -1,4 +1,4 @@
-name: "ok-template"
+name: "ok-ap"
 uac: true
 profiles:
   - name: "Default"

@@ -1,18 +1,18 @@
 <p align="center">
   <img
     src="icons/icon.png"
-    alt="ok-template logo"
+    alt="ok-ap logo"
     width="256"
     height="256"
   />
 </p>
 
-<h1 align="center">ok-template</h1>
+<h1 align="center">ok-ap</h1>
 
 <p>
-一个基于图像识别的游戏自动化模板项目，基于 <a href="https://ok-script.com/">ok-script</a> 开发。
+面向《蓝色星原：旅谣》（Azur Promilia）的图像识别游戏自动化工具，基于 <a href="https://ok-script.com/">ok-script</a> 开发。
 <br />
-A ready-to-use template for building game automation tools with <a href="https://ok-script.com/">ok-script</a>.
+Game automation tool for Azur Promilia, built with <a href="https://ok-script.com/">ok-script</a>.
 </p>
 
 <p><i>通过模拟 Windows 用户接口进行操作，无内存读取、无文件修改</i></p>
@@ -30,7 +30,7 @@ A ready-to-use template for building game automation tools with <a href="https:/
 
 ## 这是什么
 
-本项目是 ok-script 自动化项目的**通用骨架**，已包含：
+本项目是面向《蓝色星原：旅谣》（Azur Promilia）的 ok-script 自动化项目，已包含：
 
 - 可运行的入口（`main.py` / `main_debug.py`）与 ok-script 配置（`src/config.py`）
 - 任务骨架：一次性任务（`src/tasks/onetime`）、触发式任务（`src/tasks/trigger`）、测试任务（`src/tasks/test`）
@@ -64,7 +64,7 @@ uv run python main_debug.py
 
 ```pwsh
 # 启动后自动执行第1个任务，并在任务完成后退出程序
-ok-template.exe -t 1 -e
+ok-ap.exe -t 1 -e
 ```
 
 - `-t` 或 `--task`: 启动后自动执行第N个任务（`src/config.py` 中 `onetime_tasks` 列表的序号，也支持任务名）。

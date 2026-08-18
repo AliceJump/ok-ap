@@ -70,7 +70,7 @@ config = {
         'item_names_json': os.path.join('assets', 'items', 'map', 'item_names.json'),
     },
     "windows": {  # Windows游戏请填写此设置
-        "exe": ["YourGame.exe"],
+        "exe": ["AzurPromilia.exe"],  # 蓝色星原：旅谣 (Azur Promilia)
         'hwnd_class': 'UnityWndClass',  # 增加重名检查准确度
         # GUI 需要可迭代配置；设备管理器需要类对象，使用包装器同时满足两者。
         "interaction": [GameInteraction],
@@ -89,7 +89,7 @@ config = {
         # 'resize_to': [(2560, 1440), (1920, 1080), (1600, 900), (1280, 720)],  # 可选, 如果非16:9自动缩放为 resize_to
     },
     "screenshots_folder": "screenshots",  # 截图存放目录, 每次重新启动会清空目录
-    "gui_title": "ok-template",  # 窗口名
+    "gui_title": "ok-ap",  # 窗口名
     "template_matching": {  # 可选, 如使用OpenCV的模板匹配
         "coco_feature_json": os.path.join("assets", "coco_annotations.json"),
         # coco格式标记, 需要png图片, 在debug模式运行后, 会对进行切图仅保留被标记部分以减少图片大小

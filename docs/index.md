@@ -1,6 +1,6 @@
-# ok-template 项目文档
+# ok-ap 项目文档
 
-基于 [ok-script](https://ok-script.com/) 的游戏自动化模板项目。
+面向《蓝色星原：旅谣》（Azur Promilia）的游戏自动化项目，基于 [ok-script](https://ok-script.com/) 开发。
 
 ## 快速导航
 

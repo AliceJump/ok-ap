@@ -1,5 +1,5 @@
 [project]
-name = "ok-template"
+name = "ok-ap"
 version = "0.1.0"
 description = "A ready-to-use template for building game automation tools on ok-script"
 requires-python = ">=3.12,<3.13"

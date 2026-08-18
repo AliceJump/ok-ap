@@ -1,8 +1,8 @@
-site_name: ok-template
-site_description: "Template for building game automation tools with ok-script"
-site_url: https://your-name.github.io/ok-template/
-repo_name: your-name/ok-template
-repo_url: https://github.com/your-name/ok-template
+site_name: ok-ap
+site_description: "Game automation tool for Blue Star Origin: Lv Yao, built with ok-script"
+site_url: https://AliceJump.github.io/ok-ap/
+repo_name: AliceJump/ok-ap
+repo_url: https://github.com/AliceJump/ok-ap
 edit_uri: edit/master/docs/
 exclude_docs: README.md
 

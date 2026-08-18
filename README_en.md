@@ -1,16 +1,16 @@
 <p align="center">
   <img
     src="icons/icon.png"
-    alt="ok-template logo"
+    alt="ok-ap logo"
     width="256"
     height="256"
   />
 </p>
 
-<h1 align="center">ok-template</h1>
+<h1 align="center">ok-ap</h1>
 
 <p>
-A ready-to-use template for building game automation tools with <a href="https://ok-script.com/">ok-script</a>.
+Game automation tool for Azur Promilia, built with <a href="https://ok-script.com/">ok-script</a>.
 <br />
 Image-recognition-based automation, developed with <a href="https://ok-script.com/">ok-script</a>.
 </p>
@@ -30,7 +30,7 @@ Image-recognition-based automation, developed with <a href="https://ok-script.co
 
 ## What is this
 
-This repository is a **generic skeleton** for ok-script automation projects. It already includes:
+This repository is an ok-script automation project for **Azur Promilia** (蓝色星原：旅谣). It already includes:
 
 - Runnable entry points (`main.py` / `main_debug.py`) and the ok-script app config (`src/config.py`)
 - Task skeletons: one-time tasks (`src/tasks/onetime`), trigger tasks (`src/tasks/trigger`), test tasks (`src/tasks/test`)
@@ -62,7 +62,7 @@ uv run python main_debug.py
 
 ```powershell
 # Auto-run the 1st task and exit upon completion
-ok-template.exe -t 1 -e
+ok-ap.exe -t 1 -e
 ```
 
 - `-t` or `--task`: run the Nth task (index in the `onetime_tasks` list of `src/config.py`, or a task name).

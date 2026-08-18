@@ -1,0 +1,3 @@
+[submodule "ok_templates"]
+	path = ok_templates
+	url = https://github.com/AliceJump/ok-ap-x-anylabeling-asset
