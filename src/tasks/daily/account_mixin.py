@@ -19,8 +19,6 @@
 
 from __future__ import annotations
 
-import re
-
 from src.core.account_override_mixin import AccountOverrideMixin
 from src.tasks.account.account_scope_store import (
     resolve_account_id as _store_resolve_account_id,
