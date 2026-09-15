@@ -8,6 +8,7 @@ def install_startup_patches():
     if _PATCH_INSTALLED:
         return
 
+    from src.patches.cascade_dropdown_patch import install_cascade_dropdown_patch
     from src.patches.i18n_collection_patch import install_i18n_collection_patch
     from src.patches.no_frame_task_patch import install_no_frame_task_patch
     from src.patches.ocr_text_fix_patch import install_ocr_text_fix_patch
@@ -18,6 +19,7 @@ def install_startup_patches():
     from src.patches.startup_window_patch import install_startup_window_patch
     from src.patches.task_config_lock_patch import install_task_config_lock_patch
 
+    install_cascade_dropdown_patch()
     install_i18n_collection_patch()
     install_mute_promo_patch()
     install_no_frame_task_patch()
