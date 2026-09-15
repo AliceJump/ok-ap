@@ -64,7 +64,9 @@ python/
 
 ############################
 # 🧰 IDE
-.idea/
+.idea/*
+!.idea/externalDependencies.xml
+!.idea/.gitignore
 .vscode/*
 !.vscode/extensions.json
 .workbuddy/
