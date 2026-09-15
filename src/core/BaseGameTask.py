@@ -1,6 +1,8 @@
 import time
 from datetime import datetime
 
+# 覆写框架截图时间戳格式：日期_时分秒（无毫秒）
+import ok.gui.debug.Screenshot as _ok_screenshot
 from ok import BaseTask, TaskDisabledException, TriggerTask, WaitFailedException
 
 from src.core.config_migration import migrate_config_file_keys, migrate_config_values
@@ -9,8 +11,6 @@ from src.data.lang import get_lang_accessor
 from src.interaction.KeyConfig import KeyConfigManager
 from src.interaction.ScreenPosition import ScreenPosition
 
-# 覆写框架截图时间戳格式：日期_时分秒（无毫秒）
-import ok.gui.debug.Screenshot as _ok_screenshot
 _ok_screenshot.get_current_time_formatted = lambda: datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
