@@ -18,8 +18,11 @@
 """
 
 from __future__ import annotations
+import re
 
 from src.core.account_override_mixin import AccountOverrideMixin
+from src.data.FeatureList import FeatureList
+from src.image.hsv_config import HSVRange
 from src.tasks.account.account_scope_store import (
     resolve_account_id as _store_resolve_account_id,
 )
@@ -119,14 +122,15 @@ class AccountMixin(AccountOverrideMixin):
 
         注意：此方法需要子类实现具体的游戏界面操作逻辑。
         """
-        # 默认实现：只记录日志，不做实际操作
-        # 子类需要根据 Azur Promilia 的游戏界面实现具体逻辑
-        self.log_info(self.tr("login_flow 需要子类实现具体的游戏界面操作逻辑"))
-        self.log_info(self.tr("当前账号: {username}").format(username=username))
-        raise NotImplementedError(
-            "login_flow 需要子类实现具体的游戏界面操作逻辑，"
-            "请参考 ok-gf2 或 ok-end-field 的实现"
-        )
+        if result:=self.find_feature(feature_name=FeatureList.login_out ,mask_function=self.make_hsv_isolator(HSVRange.WHITE)):
+            self.click(result)
+        self.wait_click_feature(feature=FeatureList.confirm_button_2 ,settle_time=1 ,box=self.box_of_screen(0.5756,0.6126,0.5932,0.6420))
+        if result:=self.wait_feature(feature=FeatureList.account_switch):
+            self.click_at_box(result)
+        if result:=self.wait_ocr(match=re.compile(username), box=self.box_of_screen(0.3702,0.5390,0.5035,0.7178)):
+            self.click_at_box(result)
+        if result:=self.wait_feature(feature=FeatureList.login_in):
+            self.click_at_box(result)
 
     def iter_multi_account_context(
         self,

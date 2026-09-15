@@ -25,7 +25,7 @@ def _round_ratio(value):
         return value
 
 
-class BaseGameTask(RuntimeMixin, BaseTask, FrameworkOverrideMixin):
+class BaseGameTask(RuntimeMixin, FrameworkOverrideMixin, BaseTask):
     """游戏自动化任务基类，提供通用的交互和识别功能。
 
     新项目从本类派生一次性任务；触发式任务继承

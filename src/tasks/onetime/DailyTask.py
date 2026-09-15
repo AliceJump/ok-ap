@@ -15,9 +15,9 @@ from pathlib import Path
 
 from src.core.BaseGameTask import BaseGameTask
 from src.icons import Icons
-from src.tasks.daily.daily_task_runner import DailyTaskRunner
-from src.tasks.daily.daily_summary import create_task_summary_report, open_local_path_with_default_app
 from src.tasks.daily.account_mixin import AccountMixin
+from src.tasks.daily.daily_summary import create_task_summary_report, open_local_path_with_default_app
+from src.tasks.daily.daily_task_runner import DailyTaskRunner
 
 
 class DailyTask(AccountMixin, BaseGameTask):
@@ -81,10 +81,7 @@ class DailyTask(AccountMixin, BaseGameTask):
         """
         return [
             # 内置项，不做开关判定，恒执行
-            ("ensure_main", lambda: self.ensure_main(recheck_time=2, time_out=90)),
             ("收邮件", self.collect_mail),
-            ("领奖励", self.claim_rewards),
-            ("刷副本", self.run_dungeon),
         ]
 
     # ── 各任务项的具体实现（示例） ────────────────────────
@@ -100,22 +97,6 @@ class DailyTask(AccountMixin, BaseGameTask):
         #     self.wait_click_ocr(match="一键领取", time_out=5)
         self.sleep(1)
         self.log_info("邮件收取完成", notify=True)
-        return True
-
-    def claim_rewards(self):
-        """领奖励（示例实现）。"""
-        self.log_info("开始领取日常奖励...", notify=True)
-        # 示例实现
-        self.sleep(1)
-        self.log_info("日常奖励领取完成", notify=True)
-        return True
-
-    def run_dungeon(self):
-        """刷副本（示例实现）。"""
-        self.log_info("开始刷副本...", notify=True)
-        # 示例实现
-        self.sleep(1)
-        self.log_info("副本完成", notify=True)
         return True
 
     # ── 主执行入口 ────────────────────────────────────────

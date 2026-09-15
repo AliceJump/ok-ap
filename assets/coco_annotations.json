@@ -1,0 +1,122 @@
+{
+  "images": [
+    {
+      "id": 1,
+      "file_name": "images/1.png",
+      "width": 1920,
+      "height": 1080
+    }
+  ],
+  "annotations": [
+    {
+      "id": 1,
+      "image_id": 1,
+      "category_id": 1,
+      "bbox": [
+        1161,
+        659,
+        24,
+        21
+      ],
+      "area": 504,
+      "iscrowd": 0
+    },
+    {
+      "id": 2,
+      "image_id": 1,
+      "category_id": 2,
+      "bbox": [
+        956,
+        658,
+        22,
+        21
+      ],
+      "area": 462,
+      "iscrowd": 0
+    },
+    {
+      "id": 3,
+      "image_id": 1,
+      "category_id": 3,
+      "bbox": [
+        1850,
+        1014,
+        29,
+        25
+      ],
+      "area": 725,
+      "iscrowd": 0
+    },
+    {
+      "id": 4,
+      "image_id": 1,
+      "category_id": 4,
+      "bbox": [
+        1409,
+        867,
+        23,
+        20
+      ],
+      "area": 460,
+      "iscrowd": 0
+    },
+    {
+      "id": 5,
+      "image_id": 1,
+      "category_id": 5,
+      "bbox": [
+        802,
+        696,
+        35,
+        55
+      ],
+      "area": 1925,
+      "iscrowd": 0
+    },
+    {
+      "id": 6,
+      "image_id": 1,
+      "category_id": 6,
+      "bbox": [
+        1172,
+        503,
+        32,
+        22
+      ],
+      "area": 704,
+      "iscrowd": 0
+    }
+  ],
+  "categories": [
+    {
+      "id": 1,
+      "name": "confirm_button",
+      "supercategory": ""
+    },
+    {
+      "id": 2,
+      "name": "close_button",
+      "supercategory": ""
+    },
+    {
+      "id": 3,
+      "name": "login_out",
+      "supercategory": ""
+    },
+    {
+      "id": 4,
+      "name": "confirm_button_2",
+      "supercategory": ""
+    },
+    {
+      "id": 5,
+      "name": "login_in",
+      "supercategory": ""
+    },
+    {
+      "id": 6,
+      "name": "account_switch",
+      "supercategory": ""
+    }
+  ]
+}

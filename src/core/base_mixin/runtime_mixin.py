@@ -449,6 +449,7 @@ class RuntimeMixin:
             after_sleep: 点击后等待时间。
         """
         import pyautogui
+
         from src.interaction.Mouse import run_at_window_pos
 
         if activate:
@@ -471,8 +472,10 @@ class RuntimeMixin:
         if after_sleep > 0:
             self.sleep(after_sleep)
 
-    def click_box(self, box, relative_x=0.5, relative_y=0.5, alt=False, activate=False, after_sleep=0):
+    def click_at_box(self, box, relative_x=0.5, relative_y=0.5, alt=False, activate=True, after_sleep=0):
         """点击 Box 对象的指定相对位置。"""
+        if isinstance(box, list):
+            box = box[0]
         x, y = box.relative_with_variance(relative_x, relative_y)
         self.click_at(x, y, alt=alt, activate=activate, after_sleep=after_sleep)
 

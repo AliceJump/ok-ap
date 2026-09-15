@@ -38,8 +38,6 @@ class FrameworkOverrideMixin:
             feature_name = feature
         if not feature_name:
             raise ValueError("必须提供 feature_name 或 feature 参数")
-        if fL.esc in feature_name:
-            mask_function = self.make_hsv_isolator(hR.WHITE, invert=False)
         if isinstance(feature_name, (list, tuple)):
             feature_name = [self.get_feature_by_resolution(name) for name in feature_name]
         else:
