@@ -5,7 +5,11 @@ from datetime import datetime
 import ok.gui.debug.Screenshot as _ok_screenshot
 from ok import BaseTask, TaskDisabledException, TriggerTask, WaitFailedException
 
+from src.core.base_mixin.framework_override_mixin import FrameworkOverrideMixin
+from src.core.base_mixin.runtime_mixin import RuntimeMixin
 from src.core.config_migration import migrate_config_file_keys, migrate_config_values
+from src.config import config as app_config
+from src.core.game_window import find_game_hwnd
 from src.core.global_config_store import get_global_config
 from src.data.lang import get_lang_accessor
 from src.interaction.KeyConfig import KeyConfigManager
@@ -21,7 +25,7 @@ def _round_ratio(value):
         return value
 
 
-class BaseGameTask(BaseTask):
+class BaseGameTask(RuntimeMixin, BaseTask, FrameworkOverrideMixin):
     """游戏自动化任务基类，提供通用的交互和识别功能。
 
     新项目从本类派生一次性任务；触发式任务继承
@@ -247,9 +251,16 @@ class BaseGameTask(BaseTask):
 
     def ensure_main(self, recheck_time: float = 2, time_out: float = 90, **kwargs):
         """确保角色在主界面。暂未实现，调用时抛出 NotImplementedError。"""
-        raise NotImplementedError(
-            f"ensure_main(recheck_time={recheck_time}, time_out={time_out}) 尚未实现"
-        )
+        pass
+
+    def get_game_hwnd(self) -> int:
+        """Return the game hwnd resolved from the configured window features."""
+        hwnd = find_game_hwnd(app_config.get("windows", {}))
+        if hwnd:
+            return hwnd
+        device_manager = getattr(getattr(self, "executor", None), "device_manager", None)
+        hwnd_window = getattr(device_manager, "hwnd_window", None)
+        return getattr(hwnd_window, "hwnd", 0)
 
     def register_config_groups(self, groups: dict, dropdown_name: str = "配置选择"):
         """注册配置分组，支持下拉切换 + 子配置折叠显示"""

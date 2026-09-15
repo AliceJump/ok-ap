@@ -1,3 +1,7 @@
+"""纯工具方法 Mixin：不覆写框架方法，只提供独立能力。"""
+
+from __future__ import annotations
+
 import gc
 import threading
 import time
@@ -11,7 +15,6 @@ from src.config import config as app_config
 from src.core.global_config_store import KEY_CONFIG_NAME, get_global_config
 from src.data.FeatureList import FeatureList as fL
 from src.image.frame_processes import isolate_by_hsv_ranges
-from src.image.hsv_config import HSVRange as hR
 from src.interaction.Key import move_keys as send_move_keys
 from src.interaction.KeyConfig import KeyConfigManager
 from src.interaction.Mouse import (
@@ -21,16 +24,15 @@ from src.interaction.Mouse import (
     move_to_target_once as move_to_target_once_impl,
 )
 from src.interaction.Mouse import (
-    run_at_window_pos,
     smooth_drag,
 )
 from src.yolo.loader import YoloModelLoader
 
 feature_values = [f.value for f in fL]
 
-
 import ctypes
-from ctypes import wintypes
+
+import win32gui
 
 _user32 = ctypes.windll.user32
 
@@ -42,13 +44,54 @@ def _find_window_by_class(class_name: str) -> int | None:
 
 
 class RuntimeMixin:
-    """视觉识别、按键输入、鼠标控制与模型加载能力。"""
+    """视觉识别、按键输入、鼠标控制与模型加载能力（纯工具方法）。"""
 
     BASE_WIDTH = 1920
     BASE_HEIGHT = 1080
     RESOLUTION_STABLE_SECONDS = 2.0
     RESOLUTION_STABLE_TIMEOUT = 6.0
     RESOLUTION_STABLE_INTERVAL = 0.1
+
+    @property
+    def GAME_CAPTURE_CONFIG(self) -> dict:
+        """游戏窗口捕获配置（AzurPromilia.exe + UnityWndClass）。"""
+        return {
+            "windows": {
+                "exe": app_config.get("windows", {}).get("exe", []),
+                "hwnd_class": app_config.get("windows", {}).get("hwnd_class", "UnityWndClass"),
+                "interaction": app_config.get("windows", {}).get("interaction", []),
+                "capture_method": app_config.get("windows", {}).get("capture_method", ["WGC"]),
+            },
+        }
+
+    @property
+    def TOOL_WINDOW_CAPTURE_CONFIG(self) -> dict:
+        """工具窗口捕获配置（同 exe + Qt5152QWindowToolSaveBits）。"""
+        return {
+            "windows": {
+                "exe": app_config.get("windows", {}).get("exe", []),
+                "hwnd_class": "Qt5152QWindowToolSaveBits",
+            },
+        }
+
+    def find_tool_window_hwnd(self, tool_class: str = "Qt5152QWindowToolSaveBits") -> int:
+        """在游戏主窗口的子窗口中查找工具覆盖窗口。"""
+        game_hwnd = self.get_game_hwnd()
+        if not game_hwnd:
+            return 0
+        result = [0]
+        def enum_child(hwnd, _):
+            if win32gui.GetClassName(hwnd) == tool_class:
+                result[0] = hwnd
+                return False
+            return True
+        try:
+            win32gui.EnumChildWindows(game_hwnd, enum_child, None)
+        except Exception:
+            pass
+        return result[0]
+
+    # ── 坐标 / 窗口 ────────────────────────────────────
 
     def normalize_pos(self, pos):
         """
@@ -100,6 +143,37 @@ class RuntimeMixin:
             _user32.SetForegroundWindow(game_hwnd)
         else:
             self.ensure_in_front()
+
+    # ── 捕获切换 ───────────────────────────────────────
+
+    def ensure_capture(self, config: dict | None = None):
+        """切换捕获目标窗口。
+
+        Args:
+            config: 捕获配置字典，格式参考 ok-nte 的 DynamicConfig。
+                    包含 'windows' 键，值为 {'exe': ..., 'hwnd_class': ..., 'interaction': ...}。
+                    不传则使用 self.capture_config。
+        """
+        if config is None:
+            config = getattr(self, "capture_config", None)
+        if config:
+            return self.executor.device_manager.ensure_capture(config)
+
+    def ensure_tool_window_capture(self):
+        """切换捕获到游戏覆盖工具窗口（子窗口）。"""
+        tool_hwnd = self.find_tool_window_hwnd()
+        if not tool_hwnd:
+            self.log_warning("工具覆盖窗口未找到")
+            return
+        config = {
+            "windows": {
+                "exe": app_config.get("windows", {}).get("exe", []),
+                "selected_hwnd": tool_hwnd,
+            },
+        }
+        return self.executor.device_manager.ensure_capture(config)
+
+    # ── 分辨率 ─────────────────────────────────────────
 
     _resolution_warned = False
 
@@ -215,7 +289,6 @@ class RuntimeMixin:
                 if frame is not None and getattr(frame, "ndim", 0) >= 2:
                     resolution = (int(frame.shape[1]), int(frame.shape[0]))
             except Exception:
-                # Resolution checking should not stop a task when a startup frame is unavailable.
                 pass
 
             if resolution is None:
@@ -270,205 +343,6 @@ class RuntimeMixin:
         """
         return max(minimum, int(round(value * self.resolution_scale())))
 
-    def find_feature(
-        self,
-        feature_name=None,
-        horizontal_variance=0,
-        vertical_variance=0,
-        threshold=0,
-        use_gray_scale=False,
-        x=-1,
-        y=-1,
-        to_x=-1,
-        to_y=-1,
-        width=-1,
-        height=-1,
-        box=None,
-        canny_lower=0,
-        canny_higher=0,
-        frame_processor=None,
-        template=None,
-        match_method=cv2.TM_CCOEFF_NORMED,
-        screenshot=False,
-        mask_function=None,
-        frame=None,
-        limit=0,
-        target_height=0,
-        feature=None,
-    ):
-        """
-        按当前分辨率映射后执行特征识别。
-
-        Args:
-            feature_name: 特征名称或名称列表。
-            horizontal_variance: 水平容差。
-            vertical_variance: 垂直容差。
-            threshold: 匹配阈值。
-            use_gray_scale: 是否使用灰度图。
-            x: 区域左上角 X 坐标。
-            y: 区域左上角 Y 坐标。
-            to_x: 区域右下角 X 坐标。
-            to_y: 区域右下角 Y 坐标。
-            width: 识别区域宽度。
-            height: 识别区域高度。
-            box: 识别框。
-            canny_lower: Canny 下限。
-            canny_higher: Canny 上限。
-            frame_processor: 额外帧处理器。
-            template: 自定义模板。
-            match_method: 模板匹配方法。
-            screenshot: 是否截图后识别。
-            mask_function: 掩码函数。
-            frame: 输入帧。
-            limit: 返回数量限制。
-            target_height: 目标缩放高度。
-
-        Returns:
-            list: 特征识别结果列表。
-        """
-        if feature is not None and feature_name is None:
-            feature_name = feature
-        if not feature_name:
-            raise ValueError("必须提供 feature_name 或 feature 参数")
-        if fL.esc in feature_name:
-            mask_function = self.make_hsv_isolator(hR.WHITE, invert=False)
-        if isinstance(feature_name, (list, tuple)):
-            feature_name = [self.get_feature_by_resolution(name) for name in feature_name]
-        else:
-            feature_name = self.get_feature_by_resolution(feature_name)
-        result = super().find_feature(
-            feature_name,
-            horizontal_variance,
-            vertical_variance,
-            threshold,
-            use_gray_scale,
-            x,
-            y,
-            to_x,
-            to_y,
-            width,
-            height,
-            box,
-            canny_lower,
-            canny_higher,
-            frame_processor,
-            template,
-            match_method,
-            screenshot,
-            mask_function,
-            frame,
-            limit,
-            target_height,
-        )
-        return result
-
-    def find_one(
-        self,
-        feature_name=None,
-        horizontal_variance=0,
-        vertical_variance=0,
-        threshold=0,
-        use_gray_scale=False,
-        box=None,
-        canny_lower=0,
-        canny_higher=0,
-        frame_processor=None,
-        template=None,
-        mask_function=None,
-        frame=None,
-        match_method=cv2.TM_CCOEFF_NORMED,
-        screenshot=False,
-        limit=1,
-        target_height=0,
-        feature=None,
-    ):
-        """
-        按当前分辨率映射后执行单个特征识别。
-
-        Args:
-            feature_name: 特征名称。
-            horizontal_variance: 水平容差。
-            vertical_variance: 垂直容差。
-            threshold: 匹配阈值。
-            use_gray_scale: 是否使用灰度图。
-            box: 识别框。
-            canny_lower: Canny 下限。
-            canny_higher: Canny 上限。
-            frame_processor: 额外帧处理器。
-            template: 自定义模板。
-            mask_function: 掩码函数。
-            frame: 输入帧。
-            match_method: 模板匹配方法。
-            screenshot: 是否截图后识别。
-            limit: 返回数量限制。
-            target_height: 目标缩放高度。
-            feature: feature_name 的兼容别名。
-
-        Returns:
-            Box: 置信度最高的匹配框；未匹配到时返回 None。
-        """
-        # Validate feature/feature_name mutual exclusivity
-        if feature is not None and feature_name is not None:
-            raise ValueError("只能提供 feature 或 feature_name 中的一个参数，不能同时提供两者")
-        if feature is None and feature_name is None:
-            raise ValueError("必须提供 feature 或 feature_name 中的一个参数")
-
-        # Resolve alias
-        if feature is not None and feature_name is None:
-            feature_name = feature
-        return super().find_one(
-            feature_name,
-            horizontal_variance,
-            vertical_variance,
-            threshold,
-            use_gray_scale,
-            box,
-            canny_lower,
-            canny_higher,
-            frame_processor,
-            template,
-            mask_function,
-            frame,
-            match_method,
-            screenshot,
-            limit,
-            target_height,
-        )
-
-    def scroll(self, x: int, y: int, count: int) -> None:
-        """按屏幕绝对像素坐标滚轮。
-
-        Args:
-            x: 滚动位置的绝对像素 X 坐标
-            y: 滚动位置的绝对像素 Y 坐标
-            count: 滚动量。
-                正数（向上滚动）：地图 UI 放大视角 / 列表 UI 向上翻页显示靠前内容。
-                负数（向下滚动）：地图 UI 缩小视角或向下平移 / 列表 UI 向下翻页显示靠后内容。
-
-        适用场景：
-        - 地图 UI：已确定地图中心/图标附近的像素坐标时，精确缩放或平移视角。
-        - 列表 UI：已通过 OCR/特征拿到某一行条目的绝对坐标时，在该条目处滚动翻页。
-        """
-        run_at_window_pos(self.get_game_hwnd(), super().scroll, x, y, 0.5, x, y, count)
-
-    def scroll_relative(self, x: float, y: float, count: int) -> None:
-        """按屏幕相对坐标比例滚轮（x/y 范围 0~1）。
-
-        Args:
-            x: 滚动位置的相对 X 坐标（0~1，0 为左边缘，1 为右边缘）
-            y: 滚动位置的相对 Y 坐标（0~1，0 为上边缘，1 为下边缘）
-            count: 滚动量。
-                正数（向上滚动）：地图 UI 放大视角 / 列表 UI 向上翻页显示靠前内容。
-                负数（向下滚动）：地图 UI 缩小视角或向下平移 / 列表 UI 向下翻页显示靠后内容。
-
-        适用场景：
-        - 地图 UI：用 (0.5, 0.5) 等比例坐标在地图中心连续缩放，适配不同分辨率。
-        - 列表 UI：在固定相对区域（如左侧列表 0.1/0.5）滚动查找条目，避免硬编码像素。
-        """
-        run_at_window_pos(
-            self.get_game_hwnd(), super().scroll_relative, int(x * self.width), int(y * self.height), 0.5, x, y, count
-        )
-
     def get_feature_by_resolution(self, base_name: str):
         """
         根据当前分辨率选择最合适的资源后缀。
@@ -505,6 +379,8 @@ class RuntimeMixin:
 
         raise AttributeError(f"未找到任何可用资源: {base_name}")
 
+    # ── 特征等待 / 点击 ────────────────────────────────
+
     def safe_back(self, match=None, feature=None, box=None, time_out: float = 30, once_time_out: float = 2):
         """
         安全返回：持续点击返回直到找到指定目标（OCR文本或特征）。
@@ -526,7 +402,6 @@ class RuntimeMixin:
         start_time = self.active_time()
 
         while True:
-            # 检查是否已超时
             if self.active_time() - start_time > time_out:
                 self.log_info(self.tr("safe_back 超时（{time_out}s），目标未出现").format(time_out=time_out))
                 return False
@@ -552,9 +427,56 @@ class RuntimeMixin:
             ):
                 return True
 
-            # Only recover after the target had time to appear naturally.
             self.log_info("safe_back 观察超时，发送返回键")
             self.back()
+
+    # ── 全局点击 ───────────────────────────────────────
+
+    def click_at(
+        self,
+        x: int = -1,
+        y: int = -1,
+        alt: bool = False,
+        activate: bool = False,
+        after_sleep: float = 0,
+    ):
+        """统一点击入口，通过 pyautogui 在窗口指定位置点击。
+
+        Args:
+            x, y: 窗口客户区坐标（-1 表示窗口中心）。
+            alt: True 时按住 Alt 再点击。
+            activate: True 时先激活窗口到前台。
+            after_sleep: 点击后等待时间。
+        """
+        import pyautogui
+        from src.interaction.Mouse import run_at_window_pos
+
+        if activate:
+            self.active_and_send_mouse_delta(0, 0, activate=True, only_activate=True)
+            self.sleep(0.1)
+
+        hwnd = self.get_game_hwnd()
+        if x < 0 or y < 0:
+            x = round(self.width * 0.5)
+            y = round(self.height * 0.5)
+
+        if alt:
+            self.send_key_down("alt")
+            self.sleep(0.5)
+            run_at_window_pos(hwnd, pyautogui.click, x, y)
+            self.send_key_up("alt")
+        else:
+            run_at_window_pos(hwnd, pyautogui.click, x, y)
+
+        if after_sleep > 0:
+            self.sleep(after_sleep)
+
+    def click_box(self, box, relative_x=0.5, relative_y=0.5, alt=False, activate=False, after_sleep=0):
+        """点击 Box 对象的指定相对位置。"""
+        x, y = box.relative_with_variance(relative_x, relative_y)
+        self.click_at(x, y, alt=alt, activate=activate, after_sleep=after_sleep)
+
+    # ── YOLO ───────────────────────────────────────────
 
     def yolo_loader(self) -> YoloModelLoader:
         """
@@ -621,6 +543,8 @@ class RuntimeMixin:
         self._yolo_model_key = key
         return self._detector
 
+    # ── HSV / 稳定性 ───────────────────────────────────
+
     def make_hsv_isolator(self, ranges, invert=True, kernel_size=2):
         """返回一个可直接调用的 HSV 过滤函数"""
         return lambda frame: isolate_by_hsv_ranges(
@@ -644,7 +568,7 @@ class RuntimeMixin:
                 return bool(getter("use_overlay", False))
 
         try:
-            from ok import og  # type: ignore
+            from ok import og
 
             app = getattr(og, "app", None)
             ok_config = getattr(app, "ok_config", None)
@@ -727,7 +651,6 @@ class RuntimeMixin:
                 continue
             det_name = getattr(det, "name", None)
             det_conf = float(getattr(det, "confidence", 0.0) or 0.0)
-            # 检测名是模型输出运行时文本不过 tr
             self.log_info(self.tr("Raw detection: name={name}, conf={conf:.3f}").format(name=det_name, conf=det_conf))
 
             new_box = Box(
@@ -803,7 +726,6 @@ class RuntimeMixin:
         start_time = self.active_time()
         last_frame = parse_box(self.next_frame(), box)
         stable_start = None
-        # 哈希只随新帧计算一次并滚动复用，避免上一帧的哈希每轮重复计算
         last_hash = None
         if method in ("phash", "dhash"):
             from src.image.stability import hamming_distance, perceptual_hash
@@ -850,25 +772,7 @@ class RuntimeMixin:
             last_frame = current_frame
             self.sleep(refresh_interval)
 
-    def info_set(self, key, value):
-        """
-        写入运行时信息，并自动追加当前账号后缀。
-
-        Args:
-            key: 信息键名。
-            value: 信息值。
-
-        Returns:
-            Any: 基类 info_set 的返回值。
-        """
-        if self.current_user:
-            suffix = self.current_user[-4:] if len(self.current_user) >= 4 else self.current_user
-            key = f"{key}({suffix})"
-
-        if value is not None:
-            value = str(value).replace("⭐", "")
-
-        return super().info_set(key, value)
+    # ── 按键 / 移动 ────────────────────────────────────
 
     def _account_key_config(self) -> dict:
         """全局键位配置叠加当前账号覆盖后的有效键位表（无账号上下文时为全局原值）。"""
@@ -878,7 +782,6 @@ class RuntimeMixin:
             return base_config
         effective = dict(base_config)
         for key, value in override.items():
-            # 只应用已知键位，账号页之外的脏键不影响按键解析
             if key in base_config:
                 effective[key] = self._coerce_override_value(base_config[key], value)
         return effective
@@ -1051,6 +954,8 @@ class RuntimeMixin:
         )
         self.send_key_up("alt")
 
+    # ── 组合等待点击 ───────────────────────────────────
+
     def wait_click_feature(
         self,
         feature,
@@ -1205,7 +1110,6 @@ class RuntimeMixin:
                 self.click(result, after_sleep=after_sleep)
             return result
 
-        # match 支持 str / re.Pattern / list，逐项取 .pattern 防止日志出现 re.compile(...)
         if isinstance(match, (list, tuple)):
             match_text = [getattr(m, "pattern", m) for m in match]
         else:

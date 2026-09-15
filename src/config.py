@@ -104,6 +104,7 @@ config = {
         ["src.tasks.onetime.ExampleTask", "ExampleTask"],
         ["src.tasks.onetime.TestScreenshotTask", "TestScreenshotTask"],
         ["src.tasks.test.TestTask", "TestTask"],
+        ["src.tasks.test.TestInteractionTask", "TestInteractionTask"],
     ],
     "custom_tabs": [
         ["src.gui.GlobalConfigTab", "GlobalConfigTab"],
