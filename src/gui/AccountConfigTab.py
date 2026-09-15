@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from collections import OrderedDict
 from typing import Any, Dict
 
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
@@ -24,6 +25,8 @@ from src.tasks.account.account_scope_store import (
     sync_account_list_text,
     update_overrides,
 )
+
+_EDITOR_CARD_CACHE_MAX = 16
 
 
 class InMemoryConfig(dict):
@@ -57,6 +60,7 @@ class AccountConfigTab(CustomTab):
         self.current_editor_card = None
         self.account_display_to_key: Dict[str, str] = {}
         self.account_display_to_name: Dict[str, str] = {}
+        self._editor_cards: OrderedDict[str, ConfigCard] = OrderedDict()
 
         self._build_ui()
 
@@ -309,6 +313,54 @@ class AccountConfigTab(CustomTab):
             return {str(key) for key in value}
         return set()
 
+    @staticmethod
+    def _coerce_like(base_value, override_value):
+        """Coerce override_value to match the type of base_value."""
+        if base_value is None or override_value is None:
+            return override_value
+        if isinstance(base_value, bool):
+            if isinstance(override_value, bool):
+                return override_value
+            if isinstance(override_value, str):
+                v = override_value.strip().lower()
+                if v in {"true", "1", "yes", "on"}:
+                    return True
+                if v in {"false", "0", "no", "off"}:
+                    return False
+            return base_value
+        if isinstance(base_value, int) and not isinstance(base_value, bool):
+            if isinstance(override_value, int):
+                return override_value
+            if isinstance(override_value, str):
+                try:
+                    return int(override_value.strip())
+                except ValueError:
+                    return base_value
+            return base_value
+        if isinstance(base_value, float):
+            if isinstance(override_value, (int, float)):
+                return float(override_value)
+            if isinstance(override_value, str):
+                try:
+                    return float(override_value.strip())
+                except ValueError:
+                    return base_value
+            return base_value
+        if isinstance(base_value, list):
+            if isinstance(override_value, list):
+                return override_value
+            return base_value
+        if isinstance(base_value, str):
+            return str(override_value)
+        return override_value
+
+    def _editor_card_key(self, account_key: str, task_class: str) -> str:
+        return f"{account_key}::{task_class}"
+
+    def _evict_editor_cache(self):
+        while len(self._editor_cards) > _EDITOR_CARD_CACHE_MAX:
+            self._editor_cards.popitem(last=False)
+
     def _build_virtual_config(self, task, account_key: str, account_name: str):
         accounts = self.overrides_data.get("accounts") or {}
         account_map = accounts.get(account_key, {})
@@ -335,7 +387,7 @@ class AccountConfigTab(CustomTab):
     def render_task_editor(self):
         if self.current_editor_card is not None:
             self.current_editor_card.hide()
-        self.current_editor_card = None
+            self.current_editor_card = None
         self.current_virtual_config = None
         self.current_task = None
 
@@ -345,6 +397,22 @@ class AccountConfigTab(CustomTab):
         if not account_key or task is None:
             self.editor_empty_label.setText(og.app.tr("请先选择账号与任务"))
             self.editor_empty_label.show()
+            return
+
+        task_class = task.__class__.__name__
+        cache_key = self._editor_card_key(account_key, task_class)
+
+        if cache_key in self._editor_cards:
+            card = self._editor_cards[cache_key]
+            self._editor_cards.move_to_end(cache_key)
+            card.show()
+            self.editor_layout.addWidget(card)
+            self.current_virtual_config = card.config
+            self.current_task = task
+            self.current_account_key = account_key
+            self.current_account_name = account_name
+            self.current_editor_card = card
+            self.editor_empty_label.hide()
             return
 
         virtual_config, editable_keys = self._build_virtual_config(task, account_key, account_name)
@@ -371,6 +439,9 @@ class AccountConfigTab(CustomTab):
         card.card.setTitle(f"{og.app.tr(task.name)} - {account_name or account_key}")
         card.show()
         self.editor_layout.addWidget(card)
+
+        self._editor_cards[cache_key] = card
+        self._evict_editor_cache()
 
         self.current_virtual_config = card.config
         self.current_task = task
@@ -450,6 +521,7 @@ class AccountConfigTab(CustomTab):
             return self.overrides_data
 
         self.overrides_data = update_overrides(clear_task)
+        self._editor_cards.pop(self._editor_card_key(account_key, task_class), None)
         self.render_task_editor()
         self._set_status(og.app.tr("已清空：{account} / {task} 覆盖").format(
             account=self.current_account_name or account_key, task=task.name
@@ -468,6 +540,9 @@ class AccountConfigTab(CustomTab):
             return self.overrides_data
 
         self.overrides_data = update_overrides(clear_account)
+        keys_to_remove = [k for k in self._editor_cards if k.startswith(f"{account_key}::")]
+        for k in keys_to_remove:
+            self._editor_cards.pop(k, None)
         self.render_task_editor()
         self._set_status(og.app.tr("已清空账号全部覆盖：{account}").format(
             account=self.current_account_name or account_key
