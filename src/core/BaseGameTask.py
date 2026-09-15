@@ -139,8 +139,43 @@ class BaseGameTask(BaseTask):
             confidence=confidence,
         )
 
+    def box_of_screen_scaled(
+        self,
+        original_screen_width,
+        original_screen_height,
+        x_original,
+        y_original,
+        to_x=0,
+        to_y=0,
+        width_original=0,
+        height_original=0,
+        name=None,
+        hcenter=False,
+        vcenter=False,
+        confidence=1.0,
+    ):
+        """Create a screen box scaled from original resolution coordinates with rounded ratios."""
+        return super().box_of_screen_scaled(
+            original_screen_width,
+            original_screen_height,
+            _round_ratio(x_original),
+            _round_ratio(y_original),
+            _round_ratio(to_x),
+            _round_ratio(to_y),
+            width_original=width_original,
+            height_original=height_original,
+            name=name,
+            hcenter=hcenter,
+            vcenter=vcenter,
+            confidence=confidence,
+        )
+
     def click_relative(self, x, y, *args, **kwargs):
         return super().click_relative(_round_ratio(x), _round_ratio(y), *args, **kwargs)
+
+    def middle_click_relative(self, x, y, *args, **kwargs):
+        """Middle-click at relative screen coordinates with rounded ratios."""
+        return super().middle_click_relative(_round_ratio(x), _round_ratio(y), *args, **kwargs)
 
     @property
     def runtime_locale(self) -> str | None:
