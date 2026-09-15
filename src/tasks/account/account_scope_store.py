@@ -1,106 +1,518 @@
-"""账号作用域配置存储：账号列表 + 按账号/任务覆盖的配置。
-
-数据保存在 configs/account_scoped_overrides.json（运行时数据，不入库）。
-模板提供最小实现：账号列表文本与 {账号: {任务类名: {配置}}} 覆盖字典。
-"""
-from __future__ import annotations
-
+import copy
+import json
+import os
 import threading
-from typing import Any, Dict
+import uuid
+from collections.abc import Callable
+from typing import Any
 
-from ok.util.file import get_relative_path, read_json_file, write_json_file
+from ok.util.file import ensure_dir_for_file, get_relative_path
 
 _STORE_PATH = get_relative_path("configs", "account_scoped_overrides.json")
 _LOCK = threading.Lock()
-
-DEFAULT_DATA: Dict[str, Any] = {
+_CACHE_MTIME = object()
+_EMPTY_STORE: dict[str, Any] = {
     "account_list_text": "",
-    "accounts": {},  # {account_key: {task_class: {config}}}
-    "account_registry": {},  # {account_key: {username: str}}
+    "account_registry": {},
+    "accounts": {},
 }
+_CACHE_DATA: dict[str, Any] = copy.deepcopy(_EMPTY_STORE)
 
 
-def _load_raw() -> dict:
-    data = read_json_file(_STORE_PATH)
+def get_store_path() -> str:
+    return _STORE_PATH
+
+
+def _new_store() -> dict[str, Any]:
+    return copy.deepcopy(_EMPTY_STORE)
+
+
+def _backup_corrupt_store() -> str:
+    backup_path = f"{_STORE_PATH}.corrupt"
+    try:
+        os.replace(_STORE_PATH, backup_path)
+        return backup_path
+    except OSError:
+        return f"{_STORE_PATH}（备份失败：{backup_path} 无法写入）"
+
+
+def _load_store_json() -> tuple[dict[str, Any], Any]:
+    current_mtime: Any = os.path.getmtime(_STORE_PATH)
+    try:
+        with open(_STORE_PATH, encoding="utf-8") as fp:
+            raw = fp.read()
+    except OSError:
+        raise
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        backup_path = _backup_corrupt_store()
+        raise RuntimeError(f"账号覆盖配置文件损坏，已备份到 {backup_path}，请修复后重启: {exc}") from exc
     if not isinstance(data, dict):
-        return dict(DEFAULT_DATA)
-    merged = dict(DEFAULT_DATA)
-    merged.update(data)
-    return merged
+        backup_path = _backup_corrupt_store()
+        raise RuntimeError(f"账号覆盖配置文件格式异常（顶层不是对象），已备份到 {backup_path}")
+    return data, current_mtime
 
 
-def load_overrides(force: bool = False) -> dict:
-    """读取完整覆盖数据（内存态）。"""
-    return _load_raw()
+def _atomic_write_json(data: dict[str, Any]) -> Any:
+    ensure_dir_for_file(_STORE_PATH)
+    tmp_path = f"{_STORE_PATH}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as fp:
+        json.dump(data, fp, ensure_ascii=False, indent=2)
+        fp.flush()
+        os.fsync(fp.fileno())
+    os.replace(tmp_path, _STORE_PATH)
+    return os.path.getmtime(_STORE_PATH)
 
 
-def update_overrides(mutator) -> dict:
-    """原子更新覆盖数据。mutator(latest) 返回新的完整数据。"""
-    with _LOCK:
-        data = _load_raw()
-        data = mutator(data)
-        write_json_file(_STORE_PATH, data)
-        return data
+def _clean_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    return str(value)
 
 
-def parse_account_list_text(text: str) -> list[Dict[str, str]]:
-    """每行一个账号；兼容旧格式 `账号, 密码`（密码会被忽略且不存储）。"""
-    entries = []
-    for line in (text or "").splitlines():
-        line = line.strip()
+def _clean_username(value: Any) -> str:
+    return _clean_text(value).strip()
+
+
+def _parse_account_list_text_internal(account_list_text: Any) -> tuple[list[dict[str, str]], list[str]]:
+    entries: list[dict[str, str]] = []
+    invalid_lines: list[str] = []
+
+    text = _clean_text(account_list_text)
+    for raw in text.splitlines():
+        line = raw.strip()
         if not line:
             continue
-        parts = [part.strip() for part in line.split(",")]
-        username = parts[0].strip()
+
+        if "," in line:
+            username_part, password_part = line.split(",", 1)
+            username = username_part.strip()
+            password = password_part.strip()
+        else:
+            username = line.strip()
+            password = ""
+
         if not username:
+            invalid_lines.append(line)
             continue
-        entry = {"username": username}
-        if len(parts) > 1 and parts[1]:
-            entry["password"] = parts[1]
-        entries.append(entry)
+
+        entries.append({"username": username, "password": password})
+
+    return entries, invalid_lines
+
+
+def parse_account_list_text(account_list_text: Any) -> list[dict[str, str]]:
+    entries, _ = _parse_account_list_text_internal(account_list_text)
     return entries
 
 
-def sync_account_list_text(text: str) -> dict:
-    """保存账号列表并同步 account_registry（账号名是唯一 ID）。
+def _normalize_registry(raw_registry: Any) -> dict[str, dict[str, Any]]:
+    if not isinstance(raw_registry, dict):
+        return {}
 
-    Returns:
-        {"created_count": int, "reused_count": int, "invalid_count": int}
-    """
-    result = {"created_count": 0, "reused_count": 0, "invalid_count": 0}
+    normalized: dict[str, dict[str, Any]] = {}
+    for raw_account_id, raw_meta in raw_registry.items():
+        if not isinstance(raw_account_id, str):
+            continue
+        account_id = raw_account_id.strip()
+        if not account_id:
+            continue
 
-    def apply(latest: dict) -> dict:
-        latest["account_list_text"] = (text or "").strip()
-        registry = latest.setdefault("account_registry", {})
-        seen_keys = set()
-        for entry in parse_account_list_text(text):
-            username = entry["username"]
-            existing_key = next(
-                (key for key, meta in registry.items()
-                 if isinstance(meta, dict) and meta.get("username") == username),
-                None,
-            )
-            if existing_key is None:
-                key = username
-                registry[key] = {"username": username}
-                result["created_count"] += 1
-            else:
-                key = existing_key
-                registry[key]["username"] = username
-                result["reused_count"] += 1
-            seen_keys.add(key)
-        # 清理不再存在的账号 registry 与覆盖
-        for key in [k for k in registry if k not in seen_keys]:
-            registry.pop(key, None)
-        accounts = latest.setdefault("accounts", {})
-        for key in [k for k in accounts if k not in seen_keys]:
-            accounts.pop(key, None)
-        return latest
+        username = ""
+        aliases: list[str] = []
+
+        if isinstance(raw_meta, dict):
+            username = _clean_username(raw_meta.get("username", ""))
+            raw_aliases = raw_meta.get("aliases", [])
+            if isinstance(raw_aliases, list):
+                for raw_alias in raw_aliases:
+                    alias = _clean_username(raw_alias)
+                    if alias and alias not in aliases:
+                        aliases.append(alias)
+        elif isinstance(raw_meta, str):
+            username = _clean_username(raw_meta)
+
+        if username and username not in aliases:
+            aliases.insert(0, username)
+        if not username and aliases:
+            username = aliases[0]
+        if not username:
+            continue
+
+        normalized[account_id] = {
+            "username": username,
+            "aliases": aliases,
+        }
+
+    return normalized
+
+
+def _normalize_accounts_map(raw_accounts: Any) -> dict[str, dict[str, dict[str, Any]]]:
+    if not isinstance(raw_accounts, dict):
+        return {}
+
+    normalized_accounts: dict[str, dict[str, dict[str, Any]]] = {}
+    for raw_account_key, raw_task_map in raw_accounts.items():
+        if not isinstance(raw_account_key, str):
+            continue
+        account_key = raw_account_key.strip()
+        if not account_key or not isinstance(raw_task_map, dict):
+            continue
+
+        normalized_task_map: dict[str, dict[str, Any]] = {}
+        for raw_task_name, raw_override_map in raw_task_map.items():
+            if not isinstance(raw_task_name, str):
+                continue
+            task_name = raw_task_name.strip()
+            if not task_name or not isinstance(raw_override_map, dict):
+                continue
+            normalized_task_map[task_name] = dict(raw_override_map)
+
+        if normalized_task_map:
+            normalized_accounts[account_key] = normalized_task_map
+
+    return normalized_accounts
+
+
+def _find_account_id_by_username(
+    registry: dict[str, dict[str, Any]],
+    username: str,
+    include_aliases: bool = False,
+) -> str:
+    if not username:
+        return ""
+
+    exact_matches: list[str] = []
+    alias_matches: list[str] = []
+    for account_id, meta in registry.items():
+        current_username = _clean_username(meta.get("username", ""))
+        if current_username == username:
+            exact_matches.append(account_id)
+            continue
+
+        if include_aliases:
+            aliases = meta.get("aliases", [])
+            if isinstance(aliases, list) and username in aliases:
+                alias_matches.append(account_id)
+
+    if exact_matches:
+        return sorted(exact_matches)[0]
+    if include_aliases and alias_matches:
+        return sorted(alias_matches)[0]
+    return ""
+
+
+def _generate_account_id(registry: dict[str, dict[str, Any]]) -> str:
+    while True:
+        account_id = f"acc_{uuid.uuid4().hex[:12]}"
+        if account_id not in registry:
+            return account_id
+
+
+def _ensure_registry_entry(
+    registry: dict[str, dict[str, Any]],
+    username: str,
+    account_id: str | None = None,
+) -> str:
+    username = _clean_username(username)
+    if not username:
+        return ""
+
+    if account_id:
+        account_id = account_id.strip()
+    if not account_id:
+        account_id = _generate_account_id(registry)
+
+    meta = registry.setdefault(account_id, {"username": username, "aliases": [username]})
+    aliases = meta.get("aliases", [])
+    if not isinstance(aliases, list):
+        aliases = []
+    if username not in aliases:
+        aliases.append(username)
+
+    meta["aliases"] = aliases
+    meta["username"] = username
+    return account_id
+
+
+def _merge_task_maps(target: dict[str, dict[str, Any]], source: dict[str, dict[str, Any]]) -> None:
+    for task_name, override_map in source.items():
+        if task_name not in target:
+            target[task_name] = dict(override_map)
+            continue
+        target[task_name].update(dict(override_map))
+
+
+def _normalize(data: Any) -> dict[str, Any]:
+    if not isinstance(data, dict):
+        return _new_store()
+
+    account_list_text = _clean_text(data.get("account_list_text", ""))
+    registry = _normalize_registry(data.get("account_registry"))
+    raw_accounts = _normalize_accounts_map(data.get("accounts"))
+
+    normalized_accounts: dict[str, dict[str, dict[str, Any]]] = {}
+    for raw_account_key, task_map in raw_accounts.items():
+        account_id = ""
+        if raw_account_key in registry:
+            account_id = raw_account_key
+        else:
+            username = _clean_username(raw_account_key)
+            if username:
+                account_id = _find_account_id_by_username(registry, username, include_aliases=True)
+                if not account_id:
+                    account_id = _ensure_registry_entry(registry, username)
+
+        if not account_id:
+            continue
+
+        merged_task_map = normalized_accounts.setdefault(account_id, {})
+        _merge_task_maps(merged_task_map, task_map)
+
+    return {
+        "account_list_text": account_list_text,
+        "account_registry": registry,
+        "accounts": normalized_accounts,
+    }
+
+
+def _sync_account_list_text_on_data(data: dict[str, Any], text: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    normalized = _normalize(data)
+    new_entries, invalid_lines = _parse_account_list_text_internal(text)
+
+    registry = normalized.setdefault("account_registry", {})
+    accounts = normalized.setdefault("accounts", {})
+
+    reused_count = 0
+    created_count = 0
+    assigned_ids: list[str] = []
+
+    for entry in new_entries:
+        username = entry.get("username", "")
+        account_id = _find_account_id_by_username(registry, username)
+
+        if account_id:
+            reused_count += 1
+        else:
+            account_id = _generate_account_id(registry)
+            created_count += 1
+
+        _ensure_registry_entry(registry, username, account_id=account_id)
+        assigned_ids.append(account_id)
+
+    keep_ids = set(assigned_ids) | set(accounts.keys())
+    for account_id in list(registry.keys()):
+        if account_id not in keep_ids and not accounts.get(account_id):
+            registry.pop(account_id, None)
+
+    cleaned_lines = [entry.get("username", "") for entry in new_entries if entry.get("username", "")]
+    normalized["account_list_text"] = "\n".join(cleaned_lines)
+
+    summary = {
+        "total_valid": len(new_entries),
+        "invalid_count": len(invalid_lines),
+        "reused_count": reused_count,
+        "created_count": created_count,
+    }
+    return normalized, summary
+
+
+def load_overrides(force: bool = False) -> dict[str, Any]:
+    global _CACHE_MTIME
+    global _CACHE_DATA
+
+    with _LOCK:
+        if os.path.exists(_STORE_PATH):
+            current_mtime: Any = os.path.getmtime(_STORE_PATH)
+        else:
+            current_mtime = None
+
+        if not force and current_mtime == _CACHE_MTIME:
+            return copy.deepcopy(_CACHE_DATA)
+
+        if current_mtime is None:
+            data = _new_store()
+        else:
+            data, current_mtime = _load_store_json()
+
+        normalized = _normalize(data)
+        _CACHE_DATA = normalized
+        _CACHE_MTIME = current_mtime
+        return copy.deepcopy(normalized)
+
+
+def save_overrides(data: dict[str, Any]) -> dict[str, Any]:
+    global _CACHE_MTIME
+    global _CACHE_DATA
+
+    normalized = _normalize(data)
+
+    with _LOCK:
+        _CACHE_MTIME = _atomic_write_json(normalized)
+        _CACHE_DATA = normalized
+
+    return copy.deepcopy(normalized)
+
+
+def update_overrides(updater: Callable[[dict[str, Any]], dict[str, Any]]) -> dict[str, Any]:
+    global _CACHE_MTIME
+    global _CACHE_DATA
+
+    with _LOCK:
+        if os.path.exists(_STORE_PATH):
+            current, current_mtime = _load_store_json()
+            current = _normalize(current)
+        else:
+            current_mtime = None
+            current = _new_store()
+
+        updated = _normalize(updater(copy.deepcopy(current)))
+        if updated != current:
+            current_mtime = _atomic_write_json(updated)
+
+        _CACHE_DATA = updated
+        _CACHE_MTIME = current_mtime
+        return copy.deepcopy(updated)
+
+
+def sync_account_list_text(text: str) -> dict[str, Any]:
+    summary: dict[str, Any] = {}
+
+    def apply(data):
+        updated, sync_summary = _sync_account_list_text_on_data(
+            data,
+            text if isinstance(text, str) else str(text),
+        )
+        summary.update(sync_summary)
+        return updated
 
     update_overrides(apply)
-    return result
+    return summary
 
 
-def get_account_map_content(account_key: str, account_name: str = "") -> str:
-    """读取账号保存的官方地图同步 content（模板默认空实现）。"""
-    return ""
+def resolve_account_id(username: str, create_if_missing: bool = False) -> str:
+    account_name = _clean_username(username)
+    if not account_name:
+        return ""
+
+    if not create_if_missing:
+        data = load_overrides()
+        return _find_account_id_by_username(data.setdefault("account_registry", {}), account_name)
+
+    result = {"account_id": ""}
+
+    def apply(data):
+        registry = data.setdefault("account_registry", {})
+        result["account_id"] = _find_account_id_by_username(registry, account_name) or _ensure_registry_entry(
+            registry, account_name
+        )
+        return data
+
+    update_overrides(apply)
+    return result["account_id"]
+
+
+def get_account_task_overrides(account: str, task_name: str, account_name: str = "") -> dict[str, Any]:
+    if not task_name:
+        return {}
+
+    account_key = _clean_username(account)
+    account_name = _clean_username(account_name)
+    if not account_key and not account_name:
+        return {}
+
+    data = load_overrides()
+    accounts = data.get("accounts") or {}
+    registry = data.get("account_registry") or {}
+
+    resolved_key = ""
+    if account_key in registry or account_key in accounts:
+        resolved_key = account_key
+    if not resolved_key and account_key:
+        resolved_key = _find_account_id_by_username(registry, account_key)
+    if not resolved_key and account_name:
+        resolved_key = _find_account_id_by_username(registry, account_name)
+
+    if resolved_key and isinstance(accounts.get(resolved_key), dict):
+        return dict(accounts.get(resolved_key, {}).get(task_name, {}))
+
+    legacy_key = account_name or account_key
+    if legacy_key and isinstance(accounts.get(legacy_key), dict):
+        return dict(accounts.get(legacy_key, {}).get(task_name, {}))
+
+    return {}
+
+
+def _resolve_account_id_for_write(data: dict[str, Any], account: str) -> str:
+    account_key = _clean_username(account)
+    if not account_key:
+        return ""
+
+    registry = data.setdefault("account_registry", {})
+    if account_key in registry:
+        return account_key
+
+    account_id = _find_account_id_by_username(registry, account_key)
+    if account_id:
+        return account_id
+
+    return _ensure_registry_entry(registry, account_key)
+
+
+def set_account_task_overrides(account: str, task_name: str, values: dict[str, Any]) -> None:
+    if not account or not task_name:
+        return
+
+    def apply(data):
+        account_id = _resolve_account_id_for_write(data, account)
+        if not account_id:
+            return data
+        accounts = data.setdefault("accounts", {})
+        task_map = accounts.setdefault(account_id, {})
+        if values:
+            task_map[task_name] = dict(values)
+        else:
+            task_map.pop(task_name, None)
+        if not task_map:
+            accounts.pop(account_id, None)
+        return data
+
+    update_overrides(apply)
+
+
+def remove_account_task_overrides(account: str, task_name: str) -> None:
+    if not account or not task_name:
+        return
+
+    def apply(data):
+        account_id = _resolve_account_id_for_write(data, account)
+        if not account_id:
+            return data
+        accounts = data.get("accounts", {})
+        task_map = accounts.get(account_id)
+        if not isinstance(task_map, dict):
+            return data
+        task_map.pop(task_name, None)
+        if not task_map:
+            accounts.pop(account_id, None)
+        return data
+
+    update_overrides(apply)
+
+
+def list_accounts() -> list[str]:
+    data = load_overrides()
+    return list((data.get("accounts") or {}).keys())
+
+
+def get_account_list_text() -> str:
+    data = load_overrides()
+    value = data.get("account_list_text", "")
+    return value if isinstance(value, str) else str(value)
+
+
+def set_account_list_text(text: str) -> None:
+    sync_account_list_text(text)
