@@ -29,6 +29,18 @@ from src.yolo.loader import YoloModelLoader
 feature_values = [f.value for f in fL]
 
 
+import ctypes
+from ctypes import wintypes
+
+_user32 = ctypes.windll.user32
+
+
+def _find_window_by_class(class_name: str) -> int | None:
+    """按类名查找窗口，返回 HWND 或 None。"""
+    hwnd = _user32.FindWindowW(class_name, None)
+    return hwnd if hwnd else None
+
+
 class RuntimeMixin:
     """视觉识别、按键输入、鼠标控制与模型加载能力。"""
 
@@ -65,6 +77,29 @@ class RuntimeMixin:
             self.normalize_pos(end),
             duration,
         )
+
+    def find_window_by_class(self, class_name: str) -> int | None:
+        """按类名查找窗口，返回 HWND 或 None。"""
+        return _find_window_by_class(class_name)
+
+    def switch_to_window(self, class_name: str) -> int | None:
+        """切换到指定类名的窗口，返回原游戏窗口 HWND（用于后续切回）。"""
+        game_hwnd = self.get_game_hwnd()
+        target_hwnd = _find_window_by_class(class_name)
+        if target_hwnd:
+            _user32.SetForegroundWindow(target_hwnd)
+        return game_hwnd
+
+    def switch_to_tool_window(self, class_name: str = "Qt5152QWindowToolSaveBits") -> int | None:
+        """切换到工具窗口（如账号选择弹窗），返回原游戏窗口 HWND。"""
+        return self.switch_to_window(class_name)
+
+    def restore_game_window(self, game_hwnd: int | None = None):
+        """恢复游戏窗口到前台。"""
+        if game_hwnd:
+            _user32.SetForegroundWindow(game_hwnd)
+        else:
+            self.ensure_in_front()
 
     _resolution_warned = False
 
