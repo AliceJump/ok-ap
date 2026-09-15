@@ -1,5 +1,6 @@
-"""通用 Windows 游戏交互实现（基于 PostMessage 后台点击）。
+"""通用 Windows 游戏交互实现（基于 PostMessage 后台点击 + pynput 键盘输入）。
 
+所有按键（包括 ESC）统一走 pynput，需要窗口处于前台。
 不同游戏可能需要覆盖 click / send_key_down / send_key_up 等方法以适配其
 输入处理方式。模板提供最常见的默认实现，可直接在 src/config.py 的
 windows.interaction 中引用。
@@ -7,7 +8,6 @@ windows.interaction 中引用。
 import ctypes
 import time
 
-import pynput
 import win32api
 import win32con
 import win32gui
@@ -15,7 +15,13 @@ from ok.device.intercation import PostMessageInteraction
 from ok.util.logger import Logger
 from pynput.keyboard import Controller, Key
 
+from src.interaction.Mouse import active_and_send_mouse_delta
+
 logger = Logger.get_logger(__name__)
+
+# 真实鼠标事件标志（pywin32 未提供常量）
+MOUSEEVENTF_MIDDLEDOWN = 0x0020
+MOUSEEVENTF_MIDDLEUP = 0x0040
 
 
 class RECT(ctypes.Structure):
@@ -31,35 +37,110 @@ class GameInteraction(PostMessageInteraction):
         super().__init__(*args, **kwargs)
         self.cursor_position = None
         self.activated = False
-        self._esc_hwnd = 0
+        self._pressed_keys = {}  # 已成功按下的按键计数映射（规范化身份 -> 次数）
         self.keyboard = Controller()
+        self.click_pos = None
+        self.move_Cursor = False
+        self._mouse_button_down = False
 
-    def click(self, x=-1, y=-1, move_back=False, name=None, down_time=0.001, move=True, key="left"):
-        self.try_activate()
-        move_Cursor = False
-        if x < 0:
-            click_pos = win32api.MAKELONG(round(self.capture.width * 0.5), round(self.capture.height * 0.5))
-        else:
-            self.cursor_position = win32gui.GetCursorPos()
-            abs_x, abs_y = self.capture.get_abs_cords(x, y)
-            click_pos = win32api.MAKELONG(x, y)
-            win32api.SetCursorPos((abs_x, abs_y))
-            move_Cursor = True
-            time.sleep(0.001)
+    def _get_mouse_button_messages(self, key):
+        """获取鼠标按键对应的 Windows 消息。"""
         if key == "left":
-            btn_down = win32con.WM_LBUTTONDOWN
-            btn_mk = win32con.MK_LBUTTON
-            btn_up = win32con.WM_LBUTTONUP
-        else:
-            btn_down = win32con.WM_RBUTTONDOWN
-            btn_mk = win32con.MK_RBUTTON
-            btn_up = win32con.WM_RBUTTONUP
-        self.post(btn_down, btn_mk, click_pos)
-        time.sleep(down_time)
-        self.post(btn_up, 0, click_pos)
-        if x >= 0 and move_Cursor:
+            return (
+                win32con.WM_LBUTTONDOWN,
+                win32con.MK_LBUTTON,
+                win32con.WM_LBUTTONUP,
+            )
+
+        return (
+            win32con.WM_RBUTTONDOWN,
+            win32con.MK_RBUTTON,
+            win32con.WM_RBUTTONUP,
+        )
+
+    def _prepare_mouse_position(self, x, y):
+        """准备鼠标点击位置，并记录原始鼠标位置。"""
+        if x < 0:
+            return (
+                win32api.MAKELONG(
+                    round(self.capture.width * 0.5),
+                    round(self.capture.height * 0.5),
+                ),
+                False,
+            )
+
+        self.cursor_position = win32api.GetCursorPos()
+
+        abs_x, abs_y = self.capture.get_abs_cords(x, y)
+        click_pos = win32api.MAKELONG(x, y)
+
+        win32api.SetCursorPos((abs_x, abs_y))
+        time.sleep(0.001)
+
+        return click_pos, True
+
+    def _restore_cursor(self):
+        """恢复调用前的鼠标位置。"""
+        if self.move_Cursor:
             time.sleep(0.1)
             win32api.SetCursorPos(self.cursor_position)
+            self.move_Cursor = False
+
+    def click(self, x=-1, y=-1, move_back=False, name=None, down_time=0.001, move=True, key="left"):
+        if key == "middle":
+            self._click_middle(x, y, down_time)
+            return
+
+        self.try_activate()
+
+        self.click_pos, self.move_Cursor = self._prepare_mouse_position(x, y)
+        btn_down, btn_mk, btn_up = self._get_mouse_button_messages(key)
+
+        self.post(btn_down, btn_mk, self.click_pos)
+        time.sleep(down_time)
+        self.post(btn_up, 0, self.click_pos)
+
+        if x >= 0:
+            self._restore_cursor()
+
+    def mouse_down(self, x=-1, y=-1, name=None, key="right"):
+        """按下鼠标按钮（保持按下状态）。"""
+        self.try_activate()
+
+        self.click_pos, self.move_Cursor = self._prepare_mouse_position(x, y)
+        btn_down, btn_mk, _ = self._get_mouse_button_messages(key)
+
+        self.post(btn_down, btn_mk, self.click_pos)
+        self._mouse_button_down = True
+
+    def mouse_up(self, name=None, key="right"):
+        """释放鼠标按钮。"""
+        if not self._mouse_button_down:
+            return
+        _, _, btn_up = self._get_mouse_button_messages(key)
+
+        self.post(btn_up, 0, self.click_pos)
+        self._restore_cursor()
+        self._mouse_button_down = False
+
+    def _click_middle(self, x=-1, y=-1, down_time=0.001):
+        """真实鼠标事件点击中键。
+
+        PostMessage 的鼠标消息在游戏窗口未真实激活时可能被游戏丢弃，
+        真实鼠标事件直接投递到当前前台窗口，可靠性更高。
+        """
+        hwnd = self.hwnd_window.hwnd
+        if not active_and_send_mouse_delta(hwnd, only_activate=True):
+            return
+        if x < 0:
+            x = round(self.capture.width * 0.5)
+            y = round(self.capture.height * 0.5)
+        abs_x, abs_y = self.capture.get_abs_cords(x, y)
+        win32api.SetCursorPos((abs_x, abs_y))
+        time.sleep(0.001)
+        ctypes.windll.user32.mouse_event(MOUSEEVENTF_MIDDLEDOWN, 0, 0, 0, 0)
+        time.sleep(max(down_time, 0.02))
+        ctypes.windll.user32.mouse_event(MOUSEEVENTF_MIDDLEUP, 0, 0, 0, 0)
 
     def send(self, msg, wparam, lparam):
         win32gui.SendMessage(self.hwnd, msg, wparam, lparam)
@@ -73,7 +154,7 @@ class GameInteraction(PostMessageInteraction):
             self.activated = False
         elif not self.activated:
             self.activated = True
-            self.cursor_position = win32gui.GetCursorPos()
+            self.cursor_position = win32api.GetCursorPos()
             self.activate(hwnd)
             time.sleep(0.01)
         self.try_unclip(hwnd)
@@ -99,32 +180,46 @@ class GameInteraction(PostMessageInteraction):
         finally:
             self.cursor_position = None
 
+    def _normalize_key(self, key) -> str:
+        """规范化按键身份：esc/escape 归一为同一身份。"""
+        k = str(key).lower()
+        if k in ("esc", "escape"):
+            return "esc"
+        return k
+
     def send_key_down(self, key, activate=True):
-        if str(key).lower() in ("esc", "escape"):
-            self._esc_hwnd = self.hwnd_window.hwnd
-            vk_code = win32con.VK_ESCAPE
-            win32gui.SendMessage(self._esc_hwnd, win32con.WM_ACTIVATE, win32con.WA_ACTIVE, 0)
-            win32gui.PostMessage(
-                self._esc_hwnd,
-                win32con.WM_KEYDOWN,
-                vk_code,
-                self.make_lparam(vk_code, is_up=False),
-            )
-            return
+        """发送按键按下。所有按键统一走 pynput，需要窗口处于前台。"""
+        if activate:
+            hwnd = self.hwnd_window.hwnd
+            fg_before = win32gui.GetForegroundWindow()
+            was_foreground = fg_before == hwnd
+            if not active_and_send_mouse_delta(hwnd, only_activate=True):
+                return False
+            if not was_foreground:
+                # 等待窗口真正成为前台，并给游戏处理焦点切换的时间后再按键
+                start = time.monotonic()
+                while time.monotonic() - start < 1.0:
+                    if win32gui.GetForegroundWindow() == hwnd:
+                        break
+                    time.sleep(0.02)
+                else:
+                    if win32gui.GetForegroundWindow() != hwnd:
+                        logger.warning(f"按键置顶失败: key={key} 游戏={hwnd} 当前前台={win32gui.GetForegroundWindow()}")
+                        return False
+                time.sleep(0.3)
         self.keyboard.press(self._convert_key(key))
+        norm = self._normalize_key(key)
+        self._pressed_keys[norm] = self._pressed_keys.get(norm, 0) + 1
+        return True
 
     def send_key_up(self, key):
-        if str(key).lower() in ("esc", "escape"):
-            hwnd = self._esc_hwnd or self.hwnd_window.hwnd
-            vk_code = win32con.VK_ESCAPE
-            win32gui.PostMessage(
-                hwnd,
-                win32con.WM_KEYUP,
-                vk_code,
-                self.make_lparam(vk_code, is_up=True),
-            )
-            self._esc_hwnd = 0
+        # 配对保护：仅释放实际按下过的按键，避免向原前台应用发送未配对释放
+        norm = self._normalize_key(key)
+        if self._pressed_keys.get(norm, 0) <= 0:
             return
+        self._pressed_keys[norm] -= 1
+        if self._pressed_keys[norm] <= 0:
+            del self._pressed_keys[norm]
         self.keyboard.release(self._convert_key(key))
 
     def _convert_key(self, key: str):
