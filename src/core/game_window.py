@@ -1,0 +1,59 @@
+import time
+
+import psutil
+import pywintypes
+import win32gui
+import win32process
+
+
+def find_game_hwnd(window_config: dict, timeout: float = 10.0, interval: float = 0.2) -> int:
+    """Find the visible top-level game window matching the configured features."""
+    exe_config = window_config.get("exe", ())
+    if isinstance(exe_config, str):
+        exe_config = (exe_config,)
+    exe_names = {str(name).casefold() for name in exe_config if name}
+
+    class_config = window_config.get("hwnd_class", ())
+    if isinstance(class_config, str):
+        class_config = (class_config,)
+    class_names = {str(name) for name in class_config if name}
+
+    if not exe_names and not class_names:
+        return 0
+
+    deadline = time.monotonic() + timeout
+
+    while True:
+        candidates = []
+        foreground_hwnd = win32gui.GetForegroundWindow()
+
+        def collect(hwnd, _):
+            """Collect candidate window handles matching the configured criteria."""
+            try:
+                if not win32gui.IsWindowVisible(hwnd):
+                    return True
+
+                if class_names and win32gui.GetClassName(hwnd) not in class_names:
+                    return True
+
+                if exe_names:
+                    _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                    if psutil.Process(pid).name().casefold() not in exe_names:
+                        return True
+
+                left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+                area = max(0, right - left) * max(0, bottom - top)
+                candidates.append((hwnd == foreground_hwnd, area, hwnd))
+            except (OSError, psutil.Error, pywintypes.error):
+                pass
+            return True
+
+        win32gui.EnumWindows(collect, None)
+
+        if candidates:
+            return max(candidates)[2]
+
+        if time.monotonic() >= deadline:
+            return 0
+
+        time.sleep(interval)
