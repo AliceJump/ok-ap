@@ -1,17 +1,15 @@
 # ===== device layer =====
 import ctypes
+import ctypes.wintypes
+import math
 import time
+
 import win32gui
 
 user32 = ctypes.windll.user32
 
 # Windows 鼠标事件：相对移动
 MOUSEEVENTF_MOVE = 0x0001
-
-
-import math
-import time
-import win32gui
 
 
 def smooth_drag(
@@ -51,14 +49,12 @@ def smooth_drag(
         if sleep_time > 0:
             time.sleep(sleep_time)
 
+
 def _safe_print(message):
     try:
         print(message)
     except OSError:
         pass
-
-
-import math
 
 
 def calc_direction_step(
@@ -118,7 +114,7 @@ def click_down(hwnd, x, y, key="left"):
         user32.mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
     elif key == "right":
         user32.mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, 0)
-        
+
 def click_up(hwnd, key="left"):
     """
     在指定窗口内模拟鼠标抬起事件。
@@ -141,27 +137,21 @@ def active_and_send_mouse_delta(
         only_activate=False,
         delay=0.005,
         steps=5,
-):
+) -> bool:
     """
     激活指定窗口并发送相对鼠标移动。
 
-    该函数主要用于游戏自动化或需要控制特定窗口输入的场景。
-    功能包括：
-    1. 确保目标窗口被激活
-    2. 发送相对鼠标移动（mouse_event）
-
     Args:
-        hwnd (int): 目标窗口句柄
-        dx (int): 鼠标X方向移动距离（相对移动）
-        dy (int): 鼠标Y方向移动距离（相对移动）
-        activate (bool): 是否尝试激活窗口
-        only_activate (bool): 仅激活窗口，不发送鼠标移动
-        delay (float): 每一步之间的延迟
-        steps (int): 将移动拆分成多少步执行（更平滑）
+        hwnd: 目标窗口句柄
+        dx: 鼠标X方向移动距离（相对移动）
+        dy: 鼠标Y方向移动距离（相对移动）
+        activate: 是否尝试激活窗口
+        only_activate: 仅激活窗口，不发送鼠标移动
+        delay: 每一步之间的延迟
+        steps: 将移动拆分成多少步执行（更平滑）
 
-    Notes:
-        - 使用 mouse_event 发送的是相对移动
-        - steps 可以让移动更平滑，避免一次移动过大
+    Returns:
+        bool: 在请求激活时，目标窗口是否已成功成为前台窗口；未请求激活时返回 True。
     """
 
     # 如果只需要激活窗口，则强制 activate
@@ -169,16 +159,19 @@ def active_and_send_mouse_delta(
         activate = True
 
     if activate:
+        if not hwnd:
+            _safe_print(f"窗口激活失败: 无效的窗口句柄 {hwnd}")
+            return False
+
         try:
+            if not win32gui.IsWindow(hwnd):
+                _safe_print(f"窗口激活失败: 无效的窗口句柄 {hwnd}")
+                return False
+
             current_hwnd = win32gui.GetForegroundWindow()
 
             # 如果当前窗口不是目标窗口
             if current_hwnd != hwnd:
-
-                # 检查窗口句柄是否有效
-                if not win32gui.IsWindow(hwnd):
-                    _safe_print(f"窗口激活失败: 无效的窗口句柄 {hwnd}")
-                    return
 
                 # 如果窗口最小化，先恢复
                 if win32gui.IsIconic(hwnd):
@@ -204,26 +197,31 @@ def active_and_send_mouse_delta(
                     import win32con
 
                     win32api.keybd_event(win32con.VK_MENU, 0, 0, 0)
-                    time.sleep(0.01)
-
-                    win32gui.SetForegroundWindow(hwnd)
-
-                    win32api.keybd_event(win32con.VK_MENU, 0, win32con.KEYEVENTF_KEYUP, 0)
+                    try:
+                        time.sleep(0.01)
+                        win32gui.SetForegroundWindow(hwnd)
+                    finally:
+                        # 无论第二次 SetForegroundWindow 是否成功，都必须抬起 Alt，
+                        # 否则 Alt 在系统层面保持按下，后续所有按键都变成 Alt 组合键
+                        win32api.keybd_event(win32con.VK_MENU, 0, win32con.KEYEVENTF_KEYUP, 0)
 
                 time.sleep(delay)
 
                 # 检查窗口是否真的在前台
                 final_hwnd = win32gui.GetForegroundWindow()
                 if final_hwnd != hwnd:
-                    _safe_print(f"窗口激活警告: 窗口未完全置于前台 " f"(目标:{hwnd}, 当前:{final_hwnd})")
+                    _safe_print(f"窗口激活警告: 窗口未完全置于前台 (目标:{hwnd}, 当前:{final_hwnd})")
+                    return False
 
         except win32gui.error as e:
             # 错误码 0 通常不是严重错误
             if e.winerror != 0:
                 _safe_print(f"窗口激活失败 (Win32错误 {e.winerror}): {e}")
+            return False
 
         except Exception as e:
             _safe_print(f"窗口激活失败 (未知错误): {type(e).__name__}: {e}")
+            return False
 
     # 只激活窗口不发送鼠标移动
     if not only_activate:
@@ -266,6 +264,8 @@ def active_and_send_mouse_delta(
             if delay > 0:
                 time.sleep(delay)
 
+    return True
+
 
 # ===== control =====
 def move_to_target_once(hwnd, ocr_obj, screen_center_func, max_step=100, min_step=20, slow_radius=200, deadzone=4):
@@ -279,13 +279,13 @@ def move_to_target_once(hwnd, ocr_obj, screen_center_func, max_step=100, min_ste
     4. 发送鼠标移动
 
     Args:
-        hwnd (int): 目标窗口句柄
+        hwnd: 目标窗口句柄
         ocr_obj: OCR识别对象，需包含 x,y,width,height
-        screen_center_func (callable): 获取屏幕中心点的函数
-        max_step (int): 最大移动步长
-        min_step (int): 最小移动步长
-        slow_radius (int): 减速半径
-        deadzone (int): 停止移动的死区半径
+        screen_center_func: 获取屏幕中心点的函数
+        max_step: 最大移动步长
+        min_step: 最小移动步长
+        slow_radius: 减速半径
+        deadzone: 停止移动的死区半径
 
     Returns:
         tuple[int,int] | None:
@@ -325,11 +325,11 @@ def run_at_window_pos(hwnd, func, x, y, sleep_time=0.5, *args, **kwargs):
     - 在指定位置执行输入操作
 
     Args:
-        hwnd (int): 窗口句柄
-        func (callable): 要执行的函数
-        x (int): 客户区X坐标
-        y (int): 客户区Y坐标
-        sleep_time (float): 操作前后的等待时间
+        hwnd: 窗口句柄
+        func: 要执行的函数
+        x: 客户区X坐标
+        y: 客户区Y坐标
+        sleep_time: 操作前后的等待时间
         *args: 传递给 func 的参数
         **kwargs: 传递给 func 的关键字参数
     """
@@ -371,5 +371,5 @@ def run_in_window(hwnd, func, *args, **kwargs):
         if need_restore and prev and win32gui.IsWindow(prev):
             try:
                 win32gui.SetForegroundWindow(prev)
-            except:
+            except Exception:
                 pass
