@@ -245,6 +245,12 @@ class BaseGameTask(BaseTask):
             pass
         self.log_info(str(message))
 
+    def ensure_main(self, recheck_time: float = 2, time_out: float = 90, **kwargs):
+        """确保角色在主界面。暂未实现，调用时抛出 NotImplementedError。"""
+        raise NotImplementedError(
+            f"ensure_main(recheck_time={recheck_time}, time_out={time_out}) 尚未实现"
+        )
+
     def register_config_groups(self, groups: dict, dropdown_name: str = "配置选择"):
         """注册配置分组，支持下拉切换 + 子配置折叠显示"""
         if not hasattr(self, "default_config") or self.default_config is None:
