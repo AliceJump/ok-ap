@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> **⚠️ 本仓库已弃用，不再维护。**
+>
+> 本项目后续开发、问题反馈和版本下载请移步至 **[longer-sausage/OK-AzurPromilia](https://github.com/longer-sausage/OK-AzurPromilia)**。
+> 此仓库仅保留作历史参考，不再更新。
+
+---
+
 <p align="center">
   <img
     src="icons/icon.png"
