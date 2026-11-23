@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> **⚠️ This repository is deprecated and no longer maintained.**
+>
+> For continued development, issue reports, and releases, please visit **[longer-sausage/OK-AzurPromilia](https://github.com/longer-sausage/OK-AzurPromilia)**.
+> This repository is kept for historical reference only and will no longer receive updates.
+
+---
+
 <p align="center">
   <img
     src="icons/icon.png"
